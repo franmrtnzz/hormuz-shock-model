@@ -1,11 +1,8 @@
-"""
-Modelo OA/DA con Regla de Taylor — Shock de oferta por cierre del Estrecho de Ormuz.
+"""AS/AD model of a temporary Strait of Hormuz supply shock.
 
-  (1) OA (Phillips):  π_t = π_{t-1} + γ·y_t + ε_t
-  (2) IS (Demanda):   y_t = -α·(r_t - r*)
-  (3) RPM (Taylor):   r_t = r* + φ_π·(π_t - π*) + φ_y·y_t
-
-  DA (forma reducida): y_t = -β·(π_t - π*)   con β = αφ_π / (1 + αφ_y)
+The model combines an expectations-augmented Phillips curve, an IS curve and
+a Taylor rule. It is deliberately small: the purpose is to make the policy
+trade-off visible, not to produce a forecast.
 """
 
 import numpy as np
@@ -16,15 +13,15 @@ import os
 
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# --- Parametros ---
-PI_STAR, R_STAR = 2.0, 1.0        # Objetivo inflacion (%) y tipo real natural (%)
-PHI_PI, PHI_Y   = 1.5, 0.5        # Coeficientes Taylor
-GAMMA, ALPHA    = 0.4, 1.0        # Pendiente Phillips y sensibilidad IS
+# Calibration
+PI_STAR, R_STAR = 2.0, 1.0        # Inflation target and natural real rate (%)
+PHI_PI, PHI_Y   = 1.5, 0.5        # Taylor-rule coefficients
+GAMMA, ALPHA    = 0.4, 1.0        # Phillips slope and IS sensitivity
 BETA  = (ALPHA * PHI_PI) / (1 + ALPHA * PHI_Y)
 DELTA = PHI_PI - BETA * PHI_Y
-EPSILON_SHOCK, T_MAX = 3.0, 8     # Shock (pp) y periodos
+EPSILON_SHOCK, T_MAX = 3.0, 8     # Shock size (pp) and simulation periods
 
-# --- Simulacion ---
+# Simulation
 def simulate(T, pi_star, r_star, phi_pi, phi_y, gamma, alpha, eps):
     beta = (alpha * phi_pi) / (1 + alpha * phi_y)
     pi, yg, rr = np.zeros(T), np.zeros(T), np.zeros(T)
@@ -36,19 +33,19 @@ def simulate(T, pi_star, r_star, phi_pi, phi_y, gamma, alpha, eps):
     return pi, yg, rr
 
 epsilon = np.zeros(T_MAX)
-epsilon[1] = EPSILON_SHOCK   # Shock solo en t=1
+epsilon[1] = EPSILON_SHOCK   # One-period shock at t=1
 pi, y, r = simulate(T_MAX, PI_STAR, R_STAR, PHI_PI, PHI_Y, GAMMA, ALPHA, epsilon)
 
-# --- Colores y etiquetas ---
+# Colours and labels
 COL = {0: '#1B4F72', 1: '#E74C3C', 2: '#27AE60', 3: '#F39C12', 4: '#8E44AD'}
-LBL = {0: 't=0  Eq. inicial', 1: 't=1  Shock (guerra)',
-       2: 't=2  Shock desaparece', 3: 't=3  Convergencia'}
+LBL = {0: 't=0  Initial equilibrium', 1: 't=1  Supply shock',
+       2: 't=2  Shock fades', 3: 't=3  Convergence'}
 
-# --- Grafico RPM | OA-DA ---
+# Monetary-policy rule | AS/AD chart
 fig = plt.figure(figsize=(18, 10))
 gs = gridspec.GridSpec(1, 2, width_ratios=[1, 1], wspace=0.0)
-ax_l = fig.add_subplot(gs[0])       # RPM
-ax_r = fig.add_subplot(gs[1], sharey=ax_l)  # OA/DA
+ax_l = fig.add_subplot(gs[0])       # Monetary-policy rule
+ax_r = fig.add_subplot(gs[1], sharey=ax_l)  # AS/AD
 plt.setp(ax_r.get_yticklabels(), visible=False)
 
 PI_LO, PI_HI = -0.5, 7.5
@@ -57,15 +54,15 @@ R_LO, R_HI   = -1.0, 6.0
 y_arr = np.linspace(Y_LO, Y_HI, 300)
 r_arr = np.linspace(R_LO, R_HI, 300)
 
-# ── PANEL DERECHO: OA / DA ──
+# Right panel: AS / AD
 
-# DA (fija)
+# Fixed aggregate-demand curve
 ax_r.plot(y_arr, PI_STAR - y_arr / BETA, color='#2C3E50', lw=3, zorder=5)
-ax_r.text(Y_HI - 0.6, PI_STAR - (Y_HI - 0.6)/BETA + 0.3, 'DA',
+ax_r.text(Y_HI - 0.6, PI_STAR - (Y_HI - 0.6)/BETA + 0.3, 'AD',
           fontsize=16, fontweight='bold', color='#2C3E50',
           bbox=dict(boxstyle='round,pad=0.12', fc='white', alpha=0.85, ec='none'))
 
-# OA por periodo (solo los relevantes: 0, 1, 2, 3, 4)
+# Aggregate-supply curves for the relevant periods
 show = [0, 1, 2, 3, 4]
 
 for t_i in show:
@@ -84,10 +81,10 @@ for t_i in show:
     lx = Y_HI - 0.3
     ly = intercept + GAMMA * lx
     if PI_LO < ly < PI_HI:
-        ax_r.text(lx + 0.1, ly, f'OA$_{{{t_i}}}$', fontsize=11,
+        ax_r.text(lx + 0.1, ly, f'AS$_{{{t_i}}}$', fontsize=11,
                   color=COL[t_i], fontweight='bold', va='center')
 
-# Puntos de equilibrio + anotaciones
+# Equilibrium points and annotations
 offsets_r = {0: (22, -28), 1: (22, 22), 2: (22, -28)}
 for t_i in show:
     ms = 130 if t_i <= 2 else 55
@@ -106,21 +103,21 @@ for t_i in show:
             bbox=dict(boxstyle='round,pad=0.3', fc='white',
                       ec=COL[t_i], alpha=0.9, lw=1.2))
 
-# Guias
+# Reference guides
 for t_i in [0, 1, 2]:
     ax_r.plot([0, y[t_i]], [pi[t_i], pi[t_i]],
               color=COL[t_i], ls=':', alpha=0.4, lw=1)
     ax_r.plot([y[t_i], y[t_i]], [PI_LO, pi[t_i]],
               color=COL[t_i], ls=':', alpha=0.3, lw=0.8)
 
-# Flechas de transicion
+# Transition arrows
 for a, b in [(0, 1), (1, 2)]:
     ax_r.annotate('', xy=(y[b], pi[b]), xytext=(y[a], pi[a]),
                   arrowprops=dict(arrowstyle='->', color='gray',
                                   lw=2, connectionstyle='arc3,rad=0.25', alpha=0.5))
 
 ax_r.set_xlabel('Output Gap  ($y_t$, %)', fontsize=14, labelpad=10)
-ax_r.set_title('Oferta Agregada (OA) / Demanda Agregada (DA)',
+ax_r.set_title('Aggregate Supply (AS) / Aggregate Demand (AD)',
                fontsize=14, fontweight='bold', pad=15)
 ax_r.set_xlim(Y_LO, Y_HI); ax_r.set_ylim(PI_LO, PI_HI)
 ax_r.axhline(PI_STAR, color='gray', ls='--', alpha=0.25, lw=0.8)
@@ -130,12 +127,12 @@ ax_r.text(0.15, PI_STAR + 0.2, f'$\\pi^*={PI_STAR}\\%$',
           fontsize=10, color='gray', alpha=0.7)
 
 
-# ── PANEL IZQUIERDO: RPM ──
+# Left panel: monetary-policy rule
 
 rpm_pi = PI_STAR + (r_arr - R_STAR) / DELTA
 ax_l.plot(r_arr, rpm_pi, color='#2C3E50', lw=3, zorder=5)
 lbl_r = R_HI - 0.6
-ax_l.text(lbl_r + 0.1, PI_STAR + (lbl_r - R_STAR)/DELTA + 0.3, 'RPM',
+ax_l.text(lbl_r + 0.1, PI_STAR + (lbl_r - R_STAR)/DELTA + 0.3, 'MPR',
           fontsize=16, fontweight='bold', color='#2C3E50',
           bbox=dict(boxstyle='round,pad=0.12', fc='white', alpha=0.85, ec='none'))
 ax_l.invert_xaxis()
@@ -169,9 +166,9 @@ for a, b in [(0, 1), (1, 2)]:
                   arrowprops=dict(arrowstyle='->', color='gray',
                                   lw=2, connectionstyle='arc3,rad=-0.25', alpha=0.5))
 
-ax_l.set_xlabel('Tipo de interes real  ($r_t$, %)', fontsize=14, labelpad=10)
-ax_l.set_ylabel('Inflacion  ($\\pi_t$, %)', fontsize=14, labelpad=10)
-ax_l.set_title('Regla de Politica Monetaria (RPM)\nTaylor Rule',
+ax_l.set_xlabel('Real interest rate  ($r_t$, %)', fontsize=14, labelpad=10)
+ax_l.set_ylabel('Inflation  ($\\pi_t$, %)', fontsize=14, labelpad=10)
+ax_l.set_title('Monetary Policy Rule (MPR)\nTaylor rule',
                fontsize=14, fontweight='bold', pad=15)
 ax_l.set_xlim(R_HI, R_LO)
 ax_l.set_ylim(PI_LO, PI_HI)
@@ -181,7 +178,7 @@ ax_l.grid(True, alpha=0.15, lw=0.5)
 ax_l.text(R_STAR + 0.15, PI_LO + 0.3, f'$r^*={R_STAR}\\%$',
           fontsize=10, color='gray', alpha=0.7)
 
-# Leyenda
+# Legend
 leg = []
 for t_i in [0, 1, 2, 3]:
     ms = 9 if t_i <= 2 else 6
@@ -189,20 +186,18 @@ for t_i in [0, 1, 2, 3]:
     lw = 2.5 if t_i <= 2 else 1.5
     leg.append(Line2D([0], [0], color=COL[t_i], marker='o', ls=ls,
                       markersize=ms, lw=lw, label=LBL.get(t_i, f't={t_i}')))
-leg.append(Line2D([0], [0], color='#2C3E50', lw=3, label='DA / RPM'))
+leg.append(Line2D([0], [0], color='#2C3E50', lw=3, label='AD / MPR'))
 
 fig.legend(handles=leg, loc='lower center', ncol=5, fontsize=10,
            bbox_to_anchor=(0.5, -0.03), frameon=True, fancybox=True,
            edgecolor='#BDC3C7', facecolor='#FAFAFA')
 
 fig.suptitle(
-    'Shock de Oferta Negativo: Cierre del Estrecho de Ormuz\n'
-    'Modelo OA/DA + Regla de Taylor  —  Shock en t=1, desaparece en t=2',
+    'Negative Supply Shock: Closure of the Strait of Hormuz\n'
+    'AS/AD model with a Taylor rule — shock at t=1, fading from t=2',
     fontsize=16, fontweight='bold', y=1.0)
 
 plt.tight_layout(rect=[0, 0.04, 1, 0.96])
 plt.savefig(os.path.join(OUTPUT_DIR, 'hormuz_oa_da_taylor.png'),
             dpi=200, bbox_inches='tight', facecolor='white')
-plt.show()
-
-
+plt.close(fig)
